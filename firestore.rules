@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 「kibokyu」コレクション配下のみ、誰でも読み書き可能にする最小構成。
+    // 社外からアクセスされないよう、公開URLは社内にのみ共有してください。
+    match /kibokyu/{docId} {
+      allow read, write: if true;
+    }
+    // それ以外は全て拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
