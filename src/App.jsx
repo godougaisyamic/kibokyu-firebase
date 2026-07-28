@@ -47,7 +47,6 @@ const FONT_BODY =
 const FONT_NUM = "'Roboto Mono',ui-monospace,SFMono-Regular,monospace";
 
 const MAX_PER_MONTH = 3;
-const MAX_PER_DAY = 8;
 const DEFAULT_ADMIN_PIN = "1234";
 const WEEK_LABEL = ["日", "月", "火", "水", "木", "金", "土"];
 const STATUS_LABEL = { pending: "申請中", approved: "承認", rejected: "却下" };
@@ -190,17 +189,6 @@ function EmployeeView({ employees, requests, saveRequests, notify }) {
     [myExisting]
   );
 
-  // 日付ごとの全社員の申請人数（申請中＋承認済み）
-  const dailyCount = useMemo(() => {
-    const map = {};
-    requests
-      .filter((r) => r.status !== "rejected")
-      .forEach((r) => {
-        map[r.date] = (map[r.date] || 0) + 1;
-      });
-    return map;
-  }, [requests]);
-
   const toggleDate = (cell) => {
     if (!name) {
       notify("先に名前を選択してください", "error");
@@ -222,10 +210,6 @@ function EmployeeView({ employees, requests, saveRequests, notify }) {
     }
     if (remaining <= 0) {
       notify(`希望休は月${MAX_PER_MONTH}日までです`, "error");
-      return;
-    }
-    if ((dailyCount[cell.key] || 0) >= MAX_PER_DAY) {
-      notify(`この日はすでに希望者が${MAX_PER_DAY}名に達しています。別の日をお選びください`, "error");
       return;
     }
     setNewDates([...newDates, cell.key].sort());
@@ -351,7 +335,6 @@ function EmployeeView({ employees, requests, saveRequests, notify }) {
             const isPast = cell.key < tKey;
             const isNew = newDates.includes(cell.key);
             const existingReq = myExisting.find((r) => r.date === cell.key && r.status !== "rejected");
-            const isFull = !existingReq && !isNew && (dailyCount[cell.key] || 0) >= MAX_PER_DAY;
             const dowColor = cell.dow === 0 ? THEME.sunday : cell.dow === 6 ? THEME.saturday : THEME.ink;
 
             let style = { color: isPast ? THEME.inkFaint : dowColor, backgroundColor: "transparent", border: "1px solid transparent" };
@@ -359,8 +342,6 @@ function EmployeeView({ employees, requests, saveRequests, notify }) {
             else if (existingReq) {
               const c = STATUS_COLOR[existingReq.status];
               style = { color: c.fg, backgroundColor: c.bg, border: `1px solid ${c.fg}33` };
-            } else if (isFull) {
-              style = { color: THEME.inkFaint, backgroundColor: THEME.surfaceAlt, border: `1px solid ${THEME.border}` };
             }
 
             return (
@@ -372,7 +353,6 @@ function EmployeeView({ employees, requests, saveRequests, notify }) {
                 style={{ ...style, cursor: isPast ? "not-allowed" : "pointer", fontFamily: FONT_NUM }}
               >
                 <span>{cell.day}</span>
-                {isFull && <span style={{ fontSize: 8, lineHeight: 1 }}>満枠</span>}
               </button>
             );
           })}
@@ -386,9 +366,6 @@ function EmployeeView({ employees, requests, saveRequests, notify }) {
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded" style={{ backgroundColor: THEME.approvedBg, border: `1px solid ${THEME.approved}` }} /> 承認済
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded" style={{ backgroundColor: THEME.surfaceAlt, border: `1px solid ${THEME.border}` }} /> 満枠（{MAX_PER_DAY}名）
           </span>
         </div>
       </div>
@@ -701,9 +678,7 @@ function AdminView({ employees, saveEmployees, requests, saveRequests, adminPin,
             if (!cell) return <div key={i} />;
             const count = headcount[cell.key] || 0;
             const isSelected = dateFilter === cell.key;
-            let ring = "transparent";
-            if (count >= MAX_PER_DAY) ring = THEME.rejected;
-            else if (count >= MAX_PER_DAY - 2) ring = THEME.pending;
+            const ring = count >= 3 ? THEME.pending : "transparent";
             return (
               <button
                 key={i}
@@ -723,7 +698,7 @@ function AdminView({ employees, saveEmployees, requests, saveRequests, adminPin,
                 {count > 0 && (
                   <span
                     className="font-bold tabular-nums"
-                    style={{ fontSize: 11, color: isSelected ? "#fff" : count >= MAX_PER_DAY ? THEME.rejected : count >= MAX_PER_DAY - 2 ? THEME.pending : THEME.inkSub, fontFamily: FONT_NUM }}
+                    style={{ fontSize: 11, color: isSelected ? "#fff" : count >= 3 ? THEME.pending : THEME.inkSub, fontFamily: FONT_NUM }}
                   >
                     {count}人
                   </span>
@@ -734,10 +709,7 @@ function AdminView({ employees, saveEmployees, requests, saveRequests, adminPin,
         </div>
         <div className="flex flex-wrap gap-3 mt-3 text-xs" style={{ color: THEME.inkSub }}>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded" style={{ border: `1.5px solid ${THEME.pending}` }} /> 残り2名以内（{MAX_PER_DAY - 2}〜{MAX_PER_DAY - 1}人）
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded" style={{ border: `1.5px solid ${THEME.rejected}` }} /> 上限到達（{MAX_PER_DAY}人以上）
+            <span className="w-3 h-3 rounded" style={{ border: `1.5px solid ${THEME.pending}` }} /> 3人以上が同じ日を希望（人数制限はありません）
           </span>
         </div>
       </div>
